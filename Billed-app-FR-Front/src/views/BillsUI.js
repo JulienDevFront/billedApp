@@ -9,7 +9,7 @@ const row = (bill) => {
     <tr>
       <td>${bill.type}</td>
       <td>${bill.name}</td>
-      <td>${bill.date}</td>
+      <td data-testid="bill-date" data-date="${bill.rawDate || bill.dateISO}">${bill.date}</td>
       <td>${bill.amount} €</td>
       <td>${bill.status}</td>
       <td>
@@ -19,11 +19,13 @@ const row = (bill) => {
     `;
 };
 
-const rows = (data) => {
-	data && data.length
-		? data.sort((a, b) => new Date(b.date) - new Date(a.date))
-		: "";
-	return data && data.length ? data.map((bill) => row(bill)).join("") : "";
+const rows = (data = []) => {
+	const sorted = [...data].sort((a, b) => {
+		const ta = Date.parse(a.rawDate);
+		const tb = Date.parse(b.rawDate);
+		return tb - ta;
+	});
+	return sorted.map((bill) => row(bill)).join("");
 };
 
 export default ({ data: bills, loading, error }) => {
