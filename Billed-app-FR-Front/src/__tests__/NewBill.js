@@ -43,28 +43,27 @@ describe("NewBill container", () => {
 		alertSpy.mockRestore();
 	});
 
-	test("handleChange File accepts a jpg/png, uploaded and updates fileUrl/fileName/billId", async () => {
+	test("handleChangeFile accepts a jpg/png", async () => {
 		renderNewBillPage();
-		const create = jest.fn().mockResolvedValue({ fileUrl: "https://cdn/img.png", key: "1234" });
+		const create = jest.fn();
 		const store = { bills: () => ({ create }) };
-
 		const onNavigate = jest.fn();
-		const nb = new NewBill({ document, onNavigate, store, localStorage: window.localStorage });
+		new NewBill({ document, onNavigate, store, localStorage: window.localStorage });
 
+		const alertSpy = jest.spyOn(window, "alert").mockImplementation(() => {});
 		const input = screen.getByTestId("file");
-		Object.defineProperty(input, "value", { writable: true, value: "C:\\fakepath\\note.png" });
-
 		const goodFile = new File(["img"], "note.png", { type: "image/png" });
+
 		await userEvent.upload(input, goodFile);
 
-		await waitFor(() => expect(create).toHaveBeenCalledTimes(1));
+		expect(alertSpy).not.toHaveBeenCalled();
+		expect(create).not.toHaveBeenCalled();
+		expect(input.files[0].name).toBe("note.png");
 
-		expect(nb.fileUrl).toBe("https://cdn/img.png");
-		expect(nb.fileName).toBe("note.png");
-		expect(nb.billId).toBe("1234");
+		alertSpy.mockRestore();
 	});
 
-	test("handleSubmit reads the form, calls updateBill and navigates to Bills", async () => {
+	test("handleSubmit reads the form, does create then update and navigates to Bills", async () => {
 		renderNewBillPage();
 
 		const create = jest.fn().mockResolvedValue({ fileUrl: "https://cdn/img.jpg", key: "9999" });
@@ -72,25 +71,19 @@ describe("NewBill container", () => {
 		const store = { bills: () => ({ create, update }) };
 
 		const onNavigate = jest.fn();
-		const nb = new NewBill({ document, onNavigate, store, localStorage: window.localStorage });
+		new NewBill({ document, onNavigate, store, localStorage: window.localStorage });
 
 		const fileInput = screen.getByTestId("file");
-		Object.defineProperty(fileInput, "value", {
-			writable: true,
-			value: "C:\\fakepath\\justif.jpg",
-		});
 		const file = new File(["img"], "justif.jpg", { type: "image/jpeg" });
 		await userEvent.upload(fileInput, file);
-		await waitFor(() => expect(create).toHaveBeenCalled());
 
 		await userEvent.selectOptions(screen.getByTestId("expense-type"), "Transports");
 		await userEvent.clear(screen.getByTestId("expense-name"));
 		await userEvent.type(screen.getByTestId("expense-name"), "Taxi Roissy");
 		await userEvent.clear(screen.getByTestId("amount"));
 		await userEvent.type(screen.getByTestId("amount"), "42");
-		const dateInput = screen.getByTestId("datepicker");
 
-		dateInput.value = "2023-05-01";
+		const dateInput = screen.getByTestId("datepicker");
 		fireEvent.change(dateInput, { target: { value: "2023-05-01" } });
 
 		await userEvent.clear(screen.getByTestId("vat"));
@@ -102,10 +95,12 @@ describe("NewBill container", () => {
 		const form = screen.getByTestId("form-new-bill");
 		fireEvent.submit(form);
 
-		expect(update).toHaveBeenCalledTimes(1);
+		// create appelé au submit (upload), puis update
+		await waitFor(() => expect(create).toHaveBeenCalledTimes(1));
+		await waitFor(() => expect(update).toHaveBeenCalledTimes(1));
+
 		const arg = update.mock.calls[0][0];
 		const sentBill = JSON.parse(arg.data);
-
 		expect(arg.selector).toBe("9999");
 		expect(sentBill).toMatchObject({
 			type: "Transports",
@@ -116,10 +111,8 @@ describe("NewBill container", () => {
 			pct: 10,
 			commentary: "Note de test",
 			fileUrl: "https://cdn/img.jpg",
-			fileName: "justif.jpg",
 			status: "pending",
 		});
-
 		expect(onNavigate).toHaveBeenCalledWith(ROUTES_PATH.Bills);
 	});
 
